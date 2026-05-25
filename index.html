@@ -28,14 +28,12 @@
 </div>
 
 <script type="module">
-    // 1. Switched to the official, primary Hugging Face library CDN
     import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
 
     let chatbot;
 
     async function initAI() {
         try {
-            // 2. Switched to the official repository and forced the 4-bit quantized data type
             chatbot = await pipeline('text-generation', 'HuggingFaceTB/SmolLM2-135M-Instruct', {
                 device: 'wasm',
                 dtype: 'q4' 
@@ -58,6 +56,7 @@
         
         if (!text) return;
 
+        // Display user text
         log.innerText += `\nYou: ${text}\n`;
         input.value = "";
         input.disabled = true;
@@ -65,20 +64,34 @@
         log.innerText += `\nAI is thinking on your CPU...`;
 
         try {
-            const formattedPrompt = `<|im_start|>user\n${text}<|im_end|>\n<|im_start|>assistant\n`;
+            // 1. Pass structured message objects instead of raw string templates
+            const messages = [
+                { role: "system", content: "You are a helpful, brief chatbot assistant." },
+                { role: "user", content: text }
+            ];
             
-            const response = await chatbot(formattedPrompt, {
+            // 2. Tweak generation parameters to ensure crisp cutoffs
+            const response = await chatbot(messages, {
                 max_new_tokens: 60,
-                temperature: 0.7,
+                temperature: 0.6,
                 repetition_penalty: 1.2
             });
 
-            let aiText = response[0].generated_text.replace(formattedPrompt, "").trim();
-            aiText = aiText.split("<|im_end|>")[0]; 
+            // 3. Extract the generated response text directly
+            let aiText = response[0].generated_text;
+            
+            // Clean up any remaining structural artefacts if they appear
+            if (Array.isArray(aiText)) {
+                aiText = aiText[aiText.length - 1].content;
+            } else if (typeof aiText === 'object') {
+                aiText = aiText.content || JSON.stringify(aiText);
+            }
 
+            // Update UI log cleanly
             log.innerText = log.innerText.replace("AI is thinking on your CPU...", `AI: ${aiText}\n`);
         } catch (err) {
             log.innerText += `\nError during calculation: ${err.message}\n`;
+            console.error(err);
         } finally {
             input.disabled = false;
             btn.disabled = false;
