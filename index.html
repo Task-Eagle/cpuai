@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPU In-Browser Chatbot (WASM)</title>
+    <style>
+        body { font-family: sans-serif; background: #1a1a1a; color: #fff; padding: 20px; margin: 0; }
+        .chat-window { max-width: 600px; margin: 20px auto; background: #2a2a2a; border-radius: 8px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        #log { height: 300px; overflow-y: auto; border: 1px solid #444; padding: 10px; margin-bottom: 10px; background: #111; border-radius: 4px; white-space: pre-wrap; }
+        .input-box { display: flex; gap: 10px; }
+        input { flex: 1; padding: 10px; border-radius: 4px; border: 1px solid #444; background: #333; color: #fff; }
+        button { padding: 10px 20px; border: none; background: #007bff; color: white; border-radius: 4px; cursor: pointer; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        #status { font-style: italic; color: #aaa; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+<div class="chat-window">
+    <h3>CPU-Powered Local Chatbot</h3>
+    <p id="status">Loading WASM AI engine... (Downloading ~360MB model first time)...</p>
+    <div id="log">AI: Hello! I am running entirely on your device's CPU. Try asking me a question!\n</div>
+    <div class="input-box">
+        <input type="text" id="userInput" placeholder="Type your message here..." disabled>
+        <button id="sendBtn" onclick="chat()" disabled>Send</button>
+    </div>
+</div>
+
+<script type="module">
+    // Import the Hugging Face Transformers library
+    import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0';
+
+    let chatbot;
+
+    async function initAI() {
+        try {
+            // Load a highly optimized conversational model explicitly mapped to the CPU (wasm)
+            chatbot = await pipeline('text-generation', 'Xenova/SmolLM2-135M-Instruct', {
+                device: 'wasm'
+            });
+            document.getElementById('status').innerText = "AI Ready on CPU! No internet required anymore.";
+            document.getElementById('userInput').disabled = false;
+            document.getElementById('sendBtn').disabled = false;
+        } catch (e) {
+            document.getElementById('status').innerText = "Initialization failed: " + e.message;
+        }
+    }
+    initAI();
+
+    window.chat = async function() {
+        const input = document.getElementById('userInput');
+        const log = document.getElementById('log');
+        const btn = document.getElementById('sendBtn');
+        const text = input.value.trim();
+        
+        if (!text) return;
+
+        // Display user text
+        log.innerText += `\nYou: ${text}\n`;
+        input.value = "";
+        input.disabled = true;
+        btn.disabled = true;
+        log.innerText += `\nAI is thinking on your CPU...`;
+
+        try {
+            // Format prompt style to simulate basic chat structure
+            const formattedPrompt = `<|im_start|>user\n${text}<|im_end|>\n<|im_start|>assistant\n`;
+            
+            const response = await chatbot(formattedPrompt, {
+                max_new_tokens: 60,
+                temperature: 0.7,
+                repetition_penalty: 1.2
+            });
+
+            // Clean up output formatting tags
+            let aiText = response[0].generated_text.replace(formattedPrompt, "").trim();
+            aiText = aiText.split("<|im_end|>")[0]; // cut off potential trailing chat loops
+
+            // Update UI log cleanly
+            log.innerText = log.innerText.replace("AI is thinking on your CPU...", `AI: ${aiText}\n`);
+        } catch (err) {
+            log.innerText += `\nError during calculation: ${err.message}\n`;
+        } finally {
+            input.disabled = false;
+            btn.disabled = false;
+            input.focus();
+            log.scrollTop = log.scrollHeight; // Auto-scroll
+        }
+    }
+</script>
+
+</body>
+</html>
