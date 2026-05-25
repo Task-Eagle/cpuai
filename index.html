@@ -28,22 +28,24 @@
 </div>
 
 <script type="module">
-    // Import the Hugging Face Transformers library
-    import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0';
+    // 1. Switched to the official, primary Hugging Face library CDN
+    import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
 
     let chatbot;
 
     async function initAI() {
         try {
-            // Load a highly optimized conversational model explicitly mapped to the CPU (wasm)
-            chatbot = await pipeline('text-generation', 'Xenova/SmolLM2-135M-Instruct', {
-                device: 'wasm'
+            // 2. Switched to the official repository and forced the 4-bit quantized data type
+            chatbot = await pipeline('text-generation', 'HuggingFaceTB/SmolLM2-135M-Instruct', {
+                device: 'wasm',
+                dtype: 'q4' 
             });
             document.getElementById('status').innerText = "AI Ready on CPU! No internet required anymore.";
             document.getElementById('userInput').disabled = false;
             document.getElementById('sendBtn').disabled = false;
         } catch (e) {
             document.getElementById('status').innerText = "Initialization failed: " + e.message;
+            console.error(e);
         }
     }
     initAI();
@@ -56,7 +58,6 @@
         
         if (!text) return;
 
-        // Display user text
         log.innerText += `\nYou: ${text}\n`;
         input.value = "";
         input.disabled = true;
@@ -64,7 +65,6 @@
         log.innerText += `\nAI is thinking on your CPU...`;
 
         try {
-            // Format prompt style to simulate basic chat structure
             const formattedPrompt = `<|im_start|>user\n${text}<|im_end|>\n<|im_start|>assistant\n`;
             
             const response = await chatbot(formattedPrompt, {
@@ -73,11 +73,9 @@
                 repetition_penalty: 1.2
             });
 
-            // Clean up output formatting tags
             let aiText = response[0].generated_text.replace(formattedPrompt, "").trim();
-            aiText = aiText.split("<|im_end|>")[0]; // cut off potential trailing chat loops
+            aiText = aiText.split("<|im_end|>")[0]; 
 
-            // Update UI log cleanly
             log.innerText = log.innerText.replace("AI is thinking on your CPU...", `AI: ${aiText}\n`);
         } catch (err) {
             log.innerText += `\nError during calculation: ${err.message}\n`;
@@ -85,7 +83,7 @@
             input.disabled = false;
             btn.disabled = false;
             input.focus();
-            log.scrollTop = log.scrollHeight; // Auto-scroll
+            log.scrollTop = log.scrollHeight; 
         }
     }
 </script>
